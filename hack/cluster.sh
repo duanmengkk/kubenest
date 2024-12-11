@@ -347,6 +347,27 @@ function load_kubenetst_cluster_images() {
   kind load docker-image -n "$clustername" ghcr.io/kosmos-io/node-agent:"${VERSION}"
 }
 
+function create_node_agent_daemonset() {
+  # insure htpasswd
+  util::cmd_must_exist openssl
+  # generate username and password
+  username=$(openssl rand -hex 5)
+  password=$(openssl rand -base64 12)
+  echo "node-agent生成的用户名: $username"
+  echo "node-agent生成的密码: $password"
+  # Base64 encode the username and password
+  encoded_username=$(echo -n "$username" | base64)
+  encoded_password=$(echo -n "$password" | base64)
+
+  sed -e "s|^  username:.*|  username: ${encoded_username}|g" \
+    -e "s|^  password:.*|  password: ${encoded_password}|g" \
+    -e "w ${ROOT}/environments/node-agent.yaml" "$ROOT"/deploy/node-agent.yaml
+
+  local -r clustername=$1
+  CLUSTER_DIR="${ROOT}/environments/${clustername}"
+  kubectl --kubeconfig $CLUSTER_DIR/kubeconfig apply -f "${ROOT}/environments/node-agent.yaml"
+}
+
 function delete_cluster() {
   local -r clusterName=$1
   local -r clusterDir=$2
